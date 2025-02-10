@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+    environment {
+        REGION_GCP = "us-central1"
+        ZONE_GCP = "us-central1-a"
+        IMAGE_NAME = "docker-cloud"
+        PROJECT_ID = "mythic-inn-420620"
+        IMAGE_TAG = "latest"
+        DOCKER_HUB = "ganesh6498/docker-cloud"
+    }
+
+    stages {
+        stage("Authenticate with GCP") {
+            steps {
+                script {
+                    sh 'gcloud auth login'
+                    sh 'gcloud auth configure-docker $REGION_GCP-docker.pkg.dev'
+                }
+            }
+        }
+
+        stage("Build Docker Image") {
+            steps {
+                sh 'docker build -t ${IMAGE_NAME}:latest .'
+            }
+        }
+
+        stage("Authenticate with Docker Hub") {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: "docker-hub-credential",
+                    usernameVariable: "DOCKER_USER",
+                    passwordVariable: "DOCKER_PASS"
+                )]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                }
+            }
+        }
+
+        stage("Push Docker Image to Docker Hub & Artifact Registry") {
+            steps {
+                script {
+                    sh '''
+                    docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB}:latest
+                    docker push ${DOCKER_HUB}:latest
+
+                    docker tag ${IMAGE_NAME}:latest $REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}:latest
+                    docker push $REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}:latest
+                    '''
+                }
+            }
+        }
+
+        stage("Deploy to Cloud Run with Terraform") {
+            steps {
+                script {
+                    sh '''
+                    terraform init
+                    terraform plan
+                    terraform apply -auto-approve
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed!"
+        }
+    }
+}
