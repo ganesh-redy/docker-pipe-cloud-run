@@ -10,14 +10,11 @@ pipeline {
     }
 
     stages {
-        stage("Authenticate with GCP") {
-            steps {
-                script {
-                    sh 'gcloud auth login'
-                    sh 'gcloud auth configure-docker $REGION_GCP-docker.pkg.dev'
-                }
-            }
+        stage ("connecting to git") {
+        steps{
+          git branch : "main", url : "https://github.com/ganesh-redy/instance-template.git"
         }
+    }
 
         stage("Build Docker Image") {
             steps {
