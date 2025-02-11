@@ -62,14 +62,12 @@ pipeline {
                 stage("Wait & Push Docker Image to Artifact Registry") {
                     steps {
                         script {
-                            retry(3) {  // ✅ Retry Docker push if Artifact Registry is not ready
+                            retry(3) {  
                                 sh '''
-                                echo "Authenticating with Google Cloud..."
-                                export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
-                                gcloud auth configure-docker $REGION_GCP-docker.pkg.dev
+            
 
                                 echo "Waiting for Artifact Registry to be available..."
-                                sleep 20  # ✅ Adjust if needed
+                                sleep 30
                                 docker tag ${IMAGE_NAME}:${BUILD_NUMBER} $ARTIFACT_REPO:${BUILD_NUMBER}
                                 docker push $ARTIFACT_REPO:${BUILD_NUMBER}
                                 '''
