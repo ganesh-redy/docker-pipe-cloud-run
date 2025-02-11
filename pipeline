@@ -7,6 +7,7 @@ pipeline {
         PROJECT_ID = "mythic-inn-420620"
         IMAGE_TAG = "latest"
         DOCKER_HUB = "ganesh6498/docker-cloud"
+        GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-key')
     }
 
     stages {
