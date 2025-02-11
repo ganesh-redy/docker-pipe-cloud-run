@@ -115,8 +115,3 @@ variable "region" {
   default = "us-central1"
 }
 
-
-variable "region" {
-  default = "us-central1"
-}
-
