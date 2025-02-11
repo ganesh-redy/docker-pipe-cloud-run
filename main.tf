@@ -7,6 +7,8 @@ provider "google" {
 resource "google_compute_network" "net" {
   name                    = "network-off"
   auto_create_subnetworks = false
+   depends_on = [google_artifact_registry_repository.repo]
+}
 }
 
 # ✅ Fix: Corrected `region` name
