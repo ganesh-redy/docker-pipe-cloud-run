@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
     environment {
@@ -8,18 +7,19 @@ pipeline {
         PROJECT_ID = "mythic-inn-420620"
         IMAGE_TAG = "latest"
         DOCKER_HUB = "ganesh6498/docker-cloud"
+        ARTIFACT_REPO = "$REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}"
     }
 
     stages {
-        stage("git clone"){
-            steps{
-                git branch : 'main', url : 'https://github.com/ganesh-redy/docker-pipe-cloud-run.git'
+        stage("Git Clone") {
+            steps {
+                git branch: 'main', url: 'https://github.com/ganesh-redy/docker-pipe-cloud-run.git'
             }
         }
 
         stage("Build Docker Image") {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:latest .'
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER}.'
             }
         }
 
@@ -35,41 +35,50 @@ pipeline {
             }
         }
 
-        stage("Push Docker Image to Docker Hub & Artifact Registry") {
+        stage("Push Docker Image to Docker Hub") {
             steps {
-                script {
-                    sh '''
-                    docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB}:${BUILD_NUMBER}
-                    docker push ${DOCKER_HUB}:${BUILD_NUMBER}
-                    '''
+                sh '''
+                docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_HUB}:${BUILD_NUMBER}
+                docker push ${DOCKER_HUB}:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage("Run Terraform & Push Docker Image in Parallel") {
+            parallel (
+                stage ("Create Artifact Registry with Terraform") {
+                    steps {
+                        sh '''
+                          terraform init
+                          terraform plan
+                          terraform apply --auto-approve
+                        '''
+                    }
+                },
+
+                stage("Wait for Artifact Registry & Push Docker Image") {
+                    steps {
+                        script {
+                            retry(3) {  // ✅ Retry to ensure Artifact Registry is created before pushing the image
+                                sh '''
+                                echo "Waiting for Artifact Registry to be available..."
+                                sleep 20  # ✅ Adjust the wait time if needed
+                                docker tag ${IMAGE_NAME}:${BUILD_NUMBER} $ARTIFACT_REPO:${BUILD_NUMBER}
+                                docker push $ARTIFACT_REPO:${BUILD_NUMBER}
+                                '''
+                            }
+
+                            
+                        }
+                    }
                 }
-            }
+            )
         }
-        stage("run main2.tf to create artifact"){
-            steps{
-                sh '''
-                  terraform init
-                  terraform plan
-                  terraform apply -target=module.main2.tf --auto-approve
-                 
-                '''
-            }
-        }
-         stage("push the image to repo"){
-            steps{
-                sh '''
-                  
-                    docker tag ${IMAGE_NAME}:latest $REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}:${BUILD_NUMBER}
-                    docker push $REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}:${BUILD_NUMBER}
-                '''
-            }
-        }
-        
-        stage(" main.tf Terraform") {
+
+        stage("Deploy to Cloud Run using Terraform") {
             steps {
                 script {
                     sh '''
-                    terraform init
                     terraform apply -auto-approve
                     '''
                 }
@@ -79,10 +88,10 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully!"
+            echo "Pipeline completed successfully! 🚀"
         }
         failure {
-            echo "Pipeline failed!"
+            echo "Pipeline failed! ❌"
         }
     }
 }
