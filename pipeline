@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
     environment {
@@ -7,15 +8,14 @@ pipeline {
         PROJECT_ID = "mythic-inn-420620"
         IMAGE_TAG = "latest"
         DOCKER_HUB = "ganesh6498/docker-cloud"
-        GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-key')
     }
 
     stages {
-        stage ("connecting to git") {
-        steps{
-          git branch : "main", url : "https://github.com/ganesh-redy/instance-template.git"
+        stage("git clone"){
+            steps{
+                git branch : 'main' url : 'https://github.com/ganesh-redy/docker-pipe-cloud-run.git'
+            }
         }
-    }
 
         stage("Build Docker Image") {
             steps {
@@ -48,14 +48,32 @@ pipeline {
                 }
             }
         }
-
-        stage("Deploy to Cloud Run with Terraform") {
+        stage("run main2.tf to create artifact"){
+            steps{
+                sh '''
+                  terraform init
+                  terraform plan
+                  terraform apply -target=module.main2.tf --auto-approve
+                 
+                '''
+            }
+        }
+         stage("push the image to repo"){
+            steps{
+                sh '''
+                  
+                    docker tag ${IMAGE_NAME}:latest $REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}:latest
+                    docker push $REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}:latest
+                '''
+            }
+        }
+        
+        stage(" main.tf Terraform") {
             steps {
                 script {
                     sh '''
-                    terraform init
-                    terraform plan
-                    terraform apply -auto-approve
+                    
+                    terraform apply -target=module.main.tf -auto-approve
                     '''
                 }
             }
