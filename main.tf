@@ -3,75 +3,21 @@ provider "google" {
   region  = var.region
 }
 
-
-# ✅ Artifact Registry for storing Docker images
+# ✅ Create Artifact Registry for Docker images
 resource "google_artifact_registry_repository" "repo" {
-  provider      = google
   location      = var.region
-  repository_id = "my-docker-repo"  # Fix applied
+  repository_id = "my-docker-repo"
   format        = "DOCKER"
 }
 
-# ✅ Fix: Corrected `region` name
-resource "google_compute_network" "net" {
-  name                    = "network-off"
-  auto_create_subnetworks = false
-  depends_on = [google_artifact_registry_repository.repo]
+# ✅ IAM Role to allow Jenkins to push images
+resource "google_project_iam_member" "artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${var.jenkins_sa}"
 }
 
-# ✅ Fix: Corrected `region` name
-resource "google_compute_subnetwork" "sub1" {
-  name          = "sub1"
-  network       = google_compute_network.net.id
-  ip_cidr_range = "10.0.0.0/20"
-  region        = var.region  # Fix applied
-}
-
-# ✅ Fix: Corrected `source_ranges` syntax
-resource "google_compute_firewall" "firewall1" {
-  name    = "fire1"
-  network = google_compute_network.net.id
-
-  allow {
-    protocol = "tcp"
-    ports    = [443, 80, 8080, 5000]
-  }
-
-  source_ranges = ["0.0.0.0/0"]  # Fix applied
-}
-
-resource "google_compute_instance" "inst" {
-  name         = "resource1"
-  machine_type = "e2-micro"
-  zone         = "us-central1-a"  # Fix applied
-
-  boot_disk {
-    initialize_params {
-      image = "centos-stream-9"
-    }
-  }
-
-  network_interface {
-    network    = google_compute_network.net.id
-    subnetwork = google_compute_subnetwork.sub1.id
-  }
-}
-
-# ✅ Fix: Added `zone` for disk attachment
-resource "google_compute_disk" "disk" {
-  name = "disk-pipe"
-  size = 25
-  zone = "us-central1-a"  # Fix applied
-}
-
-resource "google_compute_attached_disk" "att1" {
-  disk     = google_compute_disk.disk.name
-  instance = google_compute_instance.inst.name
-  zone     = "us-central1-a"  # Fix applied
-}
-
-
-# ✅ Fix: Corrected Artifact Registry URL
+# ✅ Cloud Run Service that deploys the Docker container
 resource "google_cloud_run_service" "cloud_run" {
   name     = var.image_name
   location = var.region
@@ -79,7 +25,7 @@ resource "google_cloud_run_service" "cloud_run" {
   template {
     spec {
       containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/my-docker-repo/${var.image_name}:latest"
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/my-docker-repo/${var.image_name}:${var.build_number}"
       }
     }
   }
@@ -88,9 +34,11 @@ resource "google_cloud_run_service" "cloud_run" {
     percent         = 100
     latest_revision = true
   }
-  depends_on = [ google_artifact_registry_repository.repo ]
+
+  depends_on = [google_artifact_registry_repository.repo]
 }
 
+# ✅ Allow Public Access to Cloud Run
 resource "google_cloud_run_service_iam_member" "all_users" {
   service  = google_cloud_run_service.cloud_run.name
   location = google_cloud_run_service.cloud_run.location
@@ -98,20 +46,27 @@ resource "google_cloud_run_service_iam_member" "all_users" {
   member   = "allUsers"
 }
 
+# ✅ Output Cloud Run URL
 output "cloud_run_url" {
   value = google_cloud_run_service.cloud_run.status[0].url
 }
 
-
 variable "project_id" {
   default = "mythic-inn-420620"
-}
-
-variable "image_name" {
-  default = "docker-cloud"
 }
 
 variable "region" {
   default = "us-central1"
 }
 
+variable "image_name" {
+  default = "docker-cloud"
+}
+
+variable "jenkins_sa" {
+  default = "jenkins-sa@mythic-inn-420620.iam.gserviceaccount.com"
+}
+
+variable "build_number" {
+  default = "latest"
+}
