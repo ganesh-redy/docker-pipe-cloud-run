@@ -2,19 +2,21 @@ provider "google" {
   project = var.project_id
   region  = var.region
 }
-resource "google_compute_network" "net" {
-  name                    = "network-off"
-  auto_create_subnetworks = false
 
-  depends_on = [google_artifact_registry_repository.repo]  # 👈 Ensures main.tf runs first
+
+# ✅ Artifact Registry for storing Docker images
+resource "google_artifact_registry_repository" "repo" {
+  provider      = google
+  location      = var.region
+  repository_id = "my-docker-repo"  # Fix applied
+  format        = "DOCKER"
 }
 
 # ✅ Fix: Corrected `region` name
 resource "google_compute_network" "net" {
   name                    = "network-off"
   auto_create_subnetworks = false
-   depends_on = [google_artifact_registry_repository.repo]
-}
+  depends_on = [google_artifact_registry_repository.repo]
 }
 
 # ✅ Fix: Corrected `region` name
@@ -99,7 +101,7 @@ output "cloud_run_url" {
   value = google_cloud_run_service.cloud_run.status[0].url
 }
 
-# ✅ Fix: Corrected `region` values and `image_name` match with Jenkins
+
 variable "project_id" {
   default = "mythic-inn-420620"
 }
@@ -111,3 +113,4 @@ variable "image_name" {
 variable "region" {
   default = "us-central1"
 }
+
