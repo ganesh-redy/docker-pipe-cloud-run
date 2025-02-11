@@ -88,6 +88,7 @@ resource "google_cloud_run_service" "cloud_run" {
     percent         = 100
     latest_revision = true
   }
+  depends_on = [ google_artifact_registry_repository.repo ]
 }
 
 resource "google_cloud_run_service_iam_member" "all_users" {
@@ -109,6 +110,11 @@ variable "project_id" {
 variable "image_name" {
   default = "docker-cloud"
 }
+
+variable "region" {
+  default = "us-central1"
+}
+
 
 variable "region" {
   default = "us-central1"
