@@ -2,6 +2,12 @@ provider "google" {
   project = var.project_id
   region  = var.region
 }
+resource "google_compute_network" "net" {
+  name                    = "network-off"
+  auto_create_subnetworks = false
+
+  depends_on = [google_artifact_registry_repository.repo]  # 👈 Ensures main.tf runs first
+}
 
 # ✅ Fix: Corrected `region` name
 resource "google_compute_network" "net" {
