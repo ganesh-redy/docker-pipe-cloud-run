@@ -19,7 +19,7 @@ pipeline {
 
         stage("Build Docker Image") {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER}.'
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
             }
         }
 
@@ -45,8 +45,8 @@ pipeline {
         }
 
         stage("Run Terraform & Push Docker Image in Parallel") {
-            parallel (
-                stage ("Create Artifact Registry with Terraform") {
+            parallel {
+                stage("Create Artifact Registry with Terraform") {
                     steps {
                         sh '''
                           terraform init
@@ -54,25 +54,23 @@ pipeline {
                           terraform apply --auto-approve
                         '''
                     }
-                },
+                }
 
-                stage("Wait for Artifact Registry & Push Docker Image") {
+                stage("Wait & Push Docker Image to Artifact Registry") {
                     steps {
                         script {
-                            retry(3) {  // ✅ Retry to ensure Artifact Registry is created before pushing the image
+                            retry(3) {  // ✅ Retry Docker push if Artifact Registry is not ready
                                 sh '''
                                 echo "Waiting for Artifact Registry to be available..."
-                                sleep 20  # ✅ Adjust the wait time if needed
+                                sleep 20  # ✅ Adjust if needed
                                 docker tag ${IMAGE_NAME}:${BUILD_NUMBER} $ARTIFACT_REPO:${BUILD_NUMBER}
                                 docker push $ARTIFACT_REPO:${BUILD_NUMBER}
                                 '''
                             }
-
-                            
                         }
                     }
                 }
-            )
+            }
         }
 
         stage("Deploy to Cloud Run using Terraform") {
@@ -95,3 +93,4 @@ pipeline {
         }
     }
 }
+
