@@ -17,7 +17,7 @@ pipeline {
             }
         }
 
-        
+    }
        
 
         stage("Run Terraform & Push Docker Image in Parallel") {
@@ -36,5 +36,5 @@ pipeline {
             echo "Pipeline failed! ❌"
         }
     }
-}
+
 }
