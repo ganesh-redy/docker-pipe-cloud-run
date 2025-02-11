@@ -1,12 +1,11 @@
 pipeline {
     agent any
+
     environment {
         REGION_GCP = "us-central1"
-        ZONE_GCP = "us-central1-a"
-        IMAGE_NAME = "docker-cloud"
         PROJECT_ID = "mythic-inn-420620"
+        IMAGE_NAME = "docker-cloud"
         IMAGE_TAG = "latest"
-        DOCKER_HUB = "ganesh6498/docker-cloud"
         ARTIFACT_REPO = "${REGION_GCP}-docker.pkg.dev/${PROJECT_ID}/my-docker-repo/${IMAGE_NAME}"
         GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-key')
     }
@@ -24,28 +23,16 @@ pipeline {
             }
         }
 
-        stage("Authenticate with Docker Hub") {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "docker-hub-credential",
-                    usernameVariable: "DOCKER_USER",
-                    passwordVariable: "DOCKER_PASS"
-                )]) {
-                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
-                }
-            }
-        }
-
-        stage("Push Docker Image to Docker Hub") {
+        stage("Authenticate with Google Cloud") {
             steps {
                 sh '''
-                docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_HUB}:${BUILD_NUMBER}
-                docker push ${DOCKER_HUB}:${BUILD_NUMBER}
+                gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+                gcloud auth configure-docker ${REGION_GCP}-docker.pkg.dev
                 '''
             }
         }
-
-        stage("Run Terraform & Push Docker Image in Parallel") {
+        
+stage("Run Terraform & Push Docker Image in Parallel") {
             parallel {
                 stage("Create Artifact Registry with Terraform") {
                     steps {
@@ -78,6 +65,8 @@ pipeline {
             }
         }
     }
+        
+    
 
     post {
         success {
@@ -88,4 +77,5 @@ pipeline {
         }
     }
 }
+
 
