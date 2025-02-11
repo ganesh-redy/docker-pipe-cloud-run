@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage("git clone"){
             steps{
-                git branch : 'main' url : 'https://github.com/ganesh-redy/docker-pipe-cloud-run.git'
+                git branch : 'main', url : 'https://github.com/ganesh-redy/docker-pipe-cloud-run.git'
             }
         }
 
