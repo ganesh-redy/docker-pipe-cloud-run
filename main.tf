@@ -60,13 +60,6 @@ resource "google_compute_attached_disk" "att1" {
   zone     = "us-central1-a"  # Fix applied
 }
 
-# ✅ Artifact Registry for storing Docker images
-resource "google_artifact_registry_repository" "repo" {
-  provider      = google
-  location      = var.region
-  repository_id = "my-docker-repo"  # Fix applied
-  format        = "DOCKER"
-}
 
 # ✅ Fix: Corrected Artifact Registry URL
 resource "google_cloud_run_service" "cloud_run" {
