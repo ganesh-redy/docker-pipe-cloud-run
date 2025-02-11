@@ -7,9 +7,8 @@ pipeline {
         PROJECT_ID = "mythic-inn-420620"
         IMAGE_TAG = "latest"
         DOCKER_HUB = "ganesh6498/docker-cloud"
-        ARTIFACT_REPO = "$REGION_GCP-docker.pkg.dev/$PROJECT_ID/my-docker-repo/${IMAGE_NAME}"
+        ARTIFACT_REPO = "${REGION_GCP}-docker.pkg.dev/${PROJECT_ID}/my-docker-repo/${IMAGE_NAME}"
         GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-key')
-        
     }
 
     stages {
@@ -21,7 +20,7 @@ pipeline {
 
         stage("Build Docker Image") {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER}.'
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
             }
         }
 
@@ -47,47 +46,36 @@ pipeline {
         }
 
         stage("Run Terraform & Push Docker Image in Parallel") {
-    parallel (
-        "Create Artifact Registry with Terraform": {
-            steps {
-                script {
-                    sh '''
-                    terraform init
-                    terraform plan
-                    terraform apply --auto-approve
-                    '''
-                }
-            }
-        },
-        
-        "Wait & Push Docker Image to Artifact Registry": {
-            steps {
-                script {
-                    retry(3) {  // ✅ Retry Docker push if Artifact Registry is not ready
+            parallel {
+                stage("Create Artifact Registry with Terraform") {
+                    steps {
+                        script {
                             sh '''
-                            echo "Authenticating with Google Cloud..."
-                            export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
-                            gcloud auth configure-docker $REGION_GCP-docker.pkg.dev
-
-                            echo "Waiting for Artifact Registry to be available..."
-                            sleep 20  # ✅ Adjust if needed
-                            docker tag ${IMAGE_NAME}:${BUILD_NUMBER} $ARTIFACT_REPO:${BUILD_NUMBER}
-                            docker push $ARTIFACT_REPO:${BUILD_NUMBER}
+                            terraform init
+                            terraform plan
+                            terraform apply --auto-approve
                             '''
                         }
+                    }
                 }
-            }
-        }
-    )
-}
+                
+                stage("Wait & Push Docker Image to Artifact Registry") {
+                    steps {
+                        script {
+                            retry(3) {  // ✅ Retry Docker push if Artifact Registry is not ready
+                                sh '''
+                                echo "Authenticating with Google Cloud..."
+                                export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
+                                gcloud auth configure-docker $REGION_GCP-docker.pkg.dev
 
-
-        stage("Deploy to Cloud Run using Terraform") {
-            steps {
-                script {
-                    sh '''
-                    terraform apply -auto-approve
-                    '''
+                                echo "Waiting for Artifact Registry to be available..."
+                                sleep 20  # ✅ Adjust if needed
+                                docker tag ${IMAGE_NAME}:${BUILD_NUMBER} $ARTIFACT_REPO:${BUILD_NUMBER}
+                                docker push $ARTIFACT_REPO:${BUILD_NUMBER}
+                                '''
+                            }
+                        }
+                    }
                 }
             }
         }
